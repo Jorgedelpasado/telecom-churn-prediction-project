@@ -1,3 +1,4 @@
+import argparse
 import pandas as pd
 from pandas import DataFrame, Series
 from sklearn.metrics import (
@@ -9,6 +10,12 @@ from sklearn.metrics import (
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
+import joblib
+
+# Consts
+CLASS_LABEL = "churn"
+train_df_path = "data/train.csv.zip"
+test_df_path = "data/test.csv.zip"
 
 
 def feature_engineering(raw_df: DataFrame) -> DataFrame:
@@ -40,44 +47,76 @@ def feature_engineering(raw_df: DataFrame) -> DataFrame:
     return df
 
 
-def fit_model(X_train: DataFrame, y_train: Series) -> XGBClassifier:
-    model = XGBClassifier()
+def fit_model(
+    X_train: DataFrame, y_train: Series, random_state: int = 6
+) -> XGBClassifier:
+    model = XGBClassifier(random_state=random_state)
     model.fit(X_train, y_train)
 
     return model
 
 
-def eval_model(model: XGBClassifier, X_test: DataFrame, y_test: Series) -> dict:
-    predictions = model.predict(X_test)
+def eval_model(model: XGBClassifier, X: DataFrame, y: Series) -> dict:
+    predictions = model.predict(X)
 
     return {
-        "accuracy": accuracy_score(predictions, y_test),
-        "precision": precision_score(predictions, y_test),
-        "recall": recall_score(predictions, y_test),
-        "f1": f1_score(predictions, y_test),
+        "accuracy": accuracy_score(y, predictions),
+        "precision": precision_score(y, predictions),
+        "recall": recall_score(y, predictions),
+        "f1": f1_score(y, predictions),
     }
 
 
-if __name__ == "__main__":
+def split(random_state=6):
     print("Loading data...")
     df = pd.read_csv("data/customer_churn.csv")
-    train_df, test_df = train_test_split(df, test_size=0.20)
-    del df
 
+    train_df, test_df = train_test_split(
+        df, random_state=random_state, stratify=df["Churn"]
+    )
+
+    print("Saving split data...")
+    train_df.to_csv(train_df_path)
+    test_df.to_csv(test_df_path)
+
+
+def train():
+    print("Loading data...")
+    train_df = pd.read_csv(train_df_path)
+    test_df = pd.read_csv(test_df_path)
+
+    print("Engineering features...")
     train_df = feature_engineering(train_df)
     test_df = feature_engineering(test_df)
 
-    print("\nFitting model...")
+    print("Training model...")
     X_train = train_df.drop(["churn"], axis=1)
-    y_train = train_df["churn"]
+    y_train = train_df[CLASS_LABEL]
     model = fit_model(X_train, y_train)
 
+    print("Saving trained model...")
+    joblib.dump(model, "outputs/model.joblib")
+
+    print("Evaluating model...")
+
     train_metrics = eval_model(model, X_train, y_train)
-    print("\nTrain metrics:")
+    print("Train metrics:")
     print(train_metrics)
 
     X_test = test_df.drop(["churn"], axis=1)
-    y_test = test_df["churn"]
+    y_test = test_df[CLASS_LABEL]
     test_metrics = eval_model(model, X_test, y_test)
-    print("\nTest metrics:")
+    print("Test metrics:")
     print(test_metrics)
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(title="Split or Train step:", dest="step")
+    subparsers.required = True
+    split_parser = subparsers.add_parser("split")
+    split_parser.set_defaults(func=split)
+    train_parser = subparsers.add_parser("train")
+    train_parser.set_defaults(func=train)
+    parser.parse_args().func()
