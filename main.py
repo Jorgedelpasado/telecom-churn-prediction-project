@@ -11,11 +11,26 @@ from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 import joblib
+import mlflow
+from mlflow.models import infer_signature
 
 # Consts
 CLASS_LABEL = "churn"
 train_df_path = "data/train.csv.zip"
 test_df_path = "data/test.csv.zip"
+
+mlflow.set_tracking_uri(
+    uri="https://dagshub.com/Jorgedelpasado/telecom-churn-prediction-project.mlflow"
+)
+
+# Define the model hyperparameters
+
+params = {
+    "learning_rate": 0.1,
+    "n_estimators": 500,
+    "max_depth": 8,
+    "random_state": 6,
+}
 
 
 def feature_engineering(raw_df: DataFrame) -> DataFrame:
@@ -47,10 +62,8 @@ def feature_engineering(raw_df: DataFrame) -> DataFrame:
     return df
 
 
-def fit_model(
-    X_train: DataFrame, y_train: Series, random_state: int = 6
-) -> XGBClassifier:
-    model = XGBClassifier(random_state=random_state)
+def fit_model(X_train: DataFrame, y_train: Series, params: dict) -> XGBClassifier:
+    model = XGBClassifier(**params)
     model.fit(X_train, y_train)
 
     return model
@@ -92,7 +105,7 @@ def train():
     print("Training model...")
     X_train = train_df.drop(["churn"], axis=1)
     y_train = train_df[CLASS_LABEL]
-    model = fit_model(X_train, y_train)
+    model = fit_model(X_train, y_train, params)
 
     print("Saving trained model...")
     joblib.dump(model, "outputs/model.joblib")
@@ -108,6 +121,34 @@ def train():
     test_metrics = eval_model(model, X_test, y_test)
     print("Test metrics:")
     print(test_metrics)
+
+    mlflow.set_experiment("MLflow Quickstart")
+
+    # Start an MLflow run
+    with mlflow.start_run():
+        # Log the hyperparameters
+        mlflow.log_params(params)
+
+        # Log the loss metric
+        mlflow.log_metric("accuracy", test_metrics["accuracy"])
+        mlflow.log_metric("precision", test_metrics["precision"])
+        mlflow.log_metric("recall", test_metrics["recall"])
+        mlflow.log_metric("f1", test_metrics["f1"])
+
+        # Set a tag that we can use to remind ourselves what this run was for
+        mlflow.set_tag("Training Info", "XGBoost model for telecom churn data")
+
+        # Infer the model signature
+        signature = infer_signature(X_train, model.predict(X_train))
+
+        # Log the model
+        model_info = mlflow.sklearn.log_model(
+            sk_model=model,
+            artifact_path="telecom_churn",
+            signature=signature,
+            input_example=X_train,
+            registered_model_name="tracking-quickstart",
+        )
 
 
 if __name__ == "__main__":
