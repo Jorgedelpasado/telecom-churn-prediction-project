@@ -1,3 +1,4 @@
+import dagshub
 import argparse
 import pandas as pd
 from pandas import DataFrame, Series
@@ -13,6 +14,10 @@ from xgboost import XGBClassifier
 import joblib
 import mlflow
 from mlflow.models import infer_signature
+
+DAGSHUB_REPO_OWNER = "Jorgedelpasado"
+DAGSHUB_REPO = "telecom-churn-prediction-project"
+dagshub.init(DAGSHUB_REPO, DAGSHUB_REPO_OWNER)
 
 # Consts
 CLASS_LABEL = "churn"
@@ -31,6 +36,14 @@ params = {
     "max_depth": 8,
     "random_state": 6,
 }
+
+
+def get_or_create_experiment_id(name):
+    exp = mlflow.get_experiment_by_name(name)
+    if exp is None:
+        exp_id = mlflow.create_experiment(name)
+        return exp_id
+    return exp.experiment_id
 
 
 def feature_engineering(raw_df: DataFrame) -> DataFrame:
@@ -102,38 +115,34 @@ def train():
     train_df = feature_engineering(train_df)
     test_df = feature_engineering(test_df)
 
-    print("Training model...")
-    X_train = train_df.drop(["churn"], axis=1)
-    y_train = train_df[CLASS_LABEL]
-    model = fit_model(X_train, y_train, params)
-
-    print("Saving trained model...")
-    joblib.dump(model, "outputs/model.joblib")
-
-    print("Evaluating model...")
-
-    train_metrics = eval_model(model, X_train, y_train)
-    print("Train metrics:")
-    print(train_metrics)
-
-    X_test = test_df.drop(["churn"], axis=1)
-    y_test = test_df[CLASS_LABEL]
-    test_metrics = eval_model(model, X_test, y_test)
-    print("Test metrics:")
-    print(test_metrics)
-
-    mlflow.set_experiment("MLflow Quickstart")
+    exp_id = get_or_create_experiment_id("XGBoost churn")
 
     # Start an MLflow run
     with mlflow.start_run():
-        # Log the hyperparameters
-        mlflow.log_params(params)
 
-        # Log the loss metric
-        mlflow.log_metric("accuracy", test_metrics["accuracy"])
-        mlflow.log_metric("precision", test_metrics["precision"])
-        mlflow.log_metric("recall", test_metrics["recall"])
-        mlflow.log_metric("f1", test_metrics["f1"])
+        print("Training model...")
+        X_train = train_df.drop(["churn"], axis=1)
+        y_train = train_df[CLASS_LABEL]
+        model = fit_model(X_train, y_train, params)
+
+        print("Saving trained model...")
+        joblib.dump(model, "outputs/model.joblib")
+        # Log the hyperparameters
+        mlflow.log_param("model_class", type(model).__name__)
+        mlflow.log_params({f"model__{k}": v for k, v in model.get_params().items()})
+
+        print("Evaluating model...")
+        train_metrics = eval_model(model, X_train, y_train)
+        print("Train metrics:")
+        print(train_metrics)
+        mlflow.log_metrics({f"train__{k}": v for k, v in train_metrics.items()})
+
+        X_test = test_df.drop(["churn"], axis=1)
+        y_test = test_df[CLASS_LABEL]
+        test_metrics = eval_model(model, X_test, y_test)
+        print("Test metrics:")
+        print(test_metrics)
+        mlflow.log_metrics({f"test__{k}": v for k, v in test_metrics.items()})
 
         # Set a tag that we can use to remind ourselves what this run was for
         mlflow.set_tag("Training Info", "XGBoost model for telecom churn data")
@@ -147,7 +156,7 @@ def train():
             artifact_path="telecom_churn",
             signature=signature,
             input_example=X_train,
-            registered_model_name="tracking-quickstart",
+            registered_model_name="xgboost_churn",
         )
 
 
