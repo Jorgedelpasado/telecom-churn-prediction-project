@@ -116,7 +116,7 @@ def train():
     exp_id = get_or_create_experiment_id("Default")
 
     # Start an MLflow run
-    with mlflow.start_run(run_name=model_name):
+    with mlflow.start_run(experiment_id=exp_id, run_name=model_name):
 
         print("Training model...")
         X_train = train_df.drop(["churn"], axis=1)
