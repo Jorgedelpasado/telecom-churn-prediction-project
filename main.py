@@ -23,6 +23,7 @@ dagshub.init(DAGSHUB_REPO, DAGSHUB_REPO_OWNER)
 CLASS_LABEL = "churn"
 train_df_path = "data/train.csv.zip"
 test_df_path = "data/test.csv.zip"
+model_name = "XGBoost"
 
 mlflow.set_tracking_uri(
     uri="https://dagshub.com/Jorgedelpasado/telecom-churn-prediction-project.mlflow"
@@ -31,9 +32,6 @@ mlflow.set_tracking_uri(
 # Define the model hyperparameters
 
 params = {
-    "learning_rate": 0.1,
-    "n_estimators": 500,
-    "max_depth": 8,
     "random_state": 6,
 }
 
@@ -115,10 +113,10 @@ def train():
     train_df = feature_engineering(train_df)
     test_df = feature_engineering(test_df)
 
-    exp_id = get_or_create_experiment_id("XGBoost churn")
+    exp_id = get_or_create_experiment_id("Default")
 
     # Start an MLflow run
-    with mlflow.start_run():
+    with mlflow.start_run(run_name=model_name):
 
         print("Training model...")
         X_train = train_df.drop(["churn"], axis=1)
