@@ -10,7 +10,7 @@ from sklearn.metrics import (
 )
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier
+from sklearn.ensemble import AdaBoostClassifier
 import joblib
 import mlflow
 from mlflow.models import infer_signature
@@ -23,7 +23,7 @@ dagshub.init(DAGSHUB_REPO, DAGSHUB_REPO_OWNER)
 CLASS_LABEL = "churn"
 train_df_path = "data/train.csv.zip"
 test_df_path = "data/test.csv.zip"
-model_name = "XGBoost"
+model_name = "AdaBoost"
 
 mlflow.set_tracking_uri(
     uri="https://dagshub.com/Jorgedelpasado/telecom-churn-prediction-project.mlflow"
@@ -73,14 +73,14 @@ def feature_engineering(raw_df: DataFrame) -> DataFrame:
     return df
 
 
-def fit_model(X_train: DataFrame, y_train: Series, params: dict) -> XGBClassifier:
-    model = XGBClassifier(**params)
+def fit_model(X_train: DataFrame, y_train: Series, params: dict) -> AdaBoostClassifier:
+    model = AdaBoostClassifier(**params)
     model.fit(X_train, y_train)
 
     return model
 
 
-def eval_model(model: XGBClassifier, X: DataFrame, y: Series) -> dict:
+def eval_model(model: AdaBoostClassifier, X: DataFrame, y: Series) -> dict:
     predictions = model.predict(X)
 
     return {
@@ -143,7 +143,7 @@ def train():
         mlflow.log_metrics({f"test__{k}": v for k, v in test_metrics.items()})
 
         # Set a tag that we can use to remind ourselves what this run was for
-        mlflow.set_tag("Training Info", "XGBoost model for telecom churn data")
+        mlflow.set_tag("Training Info", "AdaBoost model for telecom churn data")
 
         # Infer the model signature
         signature = infer_signature(X_train, model.predict(X_train))
@@ -154,7 +154,7 @@ def train():
             artifact_path="telecom_churn",
             signature=signature,
             input_example=X_train,
-            registered_model_name="xgboost_churn",
+            registered_model_name="adaboost_churn",
         )
 
 
