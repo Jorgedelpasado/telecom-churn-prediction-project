@@ -10,7 +10,7 @@ from sklearn.metrics import (
 )
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
+from xgboost import XGBClassifier
 import joblib
 import mlflow
 from mlflow.models import infer_signature
@@ -23,7 +23,7 @@ dagshub.init(DAGSHUB_REPO, DAGSHUB_REPO_OWNER)
 CLASS_LABEL = "churn"
 train_df_path = "data/train.csv.zip"
 test_df_path = "data/test.csv.zip"
-model_name = "Logistic"
+model_name = "XGBoost_gs"
 
 mlflow.set_tracking_uri(
     uri="https://dagshub.com/Jorgedelpasado/telecom-churn-prediction-project.mlflow"
@@ -32,6 +32,9 @@ mlflow.set_tracking_uri(
 # Define the model hyperparameters
 
 params = {
+    "max_depth": 5,
+    "learning_rate": 0.1,
+    "n_estimators": 300,
     "random_state": 6,
 }
 
@@ -73,14 +76,14 @@ def feature_engineering(raw_df: DataFrame) -> DataFrame:
     return df
 
 
-def fit_model(X_train: DataFrame, y_train: Series, params: dict) -> LogisticRegression:
-    model = LogisticRegression(**params)
+def fit_model(X_train: DataFrame, y_train: Series, params: dict) -> XGBClassifier:
+    model = XGBClassifier(**params)
     model.fit(X_train, y_train)
 
     return model
 
 
-def eval_model(model: LogisticRegression, X: DataFrame, y: Series) -> dict:
+def eval_model(model: XGBClassifier, X: DataFrame, y: Series) -> dict:
     predictions = model.predict(X)
 
     return {
@@ -144,7 +147,8 @@ def train():
 
         # Set a tag that we can use to remind ourselves what this run was for
         mlflow.set_tag(
-            "Training Info", "Logistic regression model for telecom churn data"
+            "Training Info",
+            "XGBoost model for telecom churn data with best parameters from grid search",
         )
 
         # Infer the model signature
@@ -156,7 +160,7 @@ def train():
             artifact_path="telecom_churn",
             signature=signature,
             input_example=X_train,
-            registered_model_name="logistic_churn",
+            registered_model_name="xgboost_gs_churn",
         )
 
 
