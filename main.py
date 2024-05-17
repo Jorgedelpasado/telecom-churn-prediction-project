@@ -103,8 +103,8 @@ def split(random_state=6):
     )
 
     print("Saving split data...")
-    train_df.to_csv(train_df_path)
-    test_df.to_csv(test_df_path)
+    train_df.to_csv(train_df_path, index=False)
+    test_df.to_csv(test_df_path, index=False)
 
 
 def train():
