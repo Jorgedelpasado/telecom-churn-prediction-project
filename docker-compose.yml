@@ -1,0 +1,10 @@
+services:
+  fastapichurn:
+    image: fastapi
+    ports:
+      - "80:80"
+
+  streamlit:
+    image: streamlit
+    ports:
+      - "8501:8501"
